@@ -1,6 +1,6 @@
 # BertTokenizer4D
 
-A Delphi implementation of the BERT tokenizer — `TBertTokenizer` — inspired by the .NET `BertTokenizer`. It supports WordPiece tokenization and converts text into token ID sequences ready for input into BERT models via ONNX.
+A Delphi implementation of the BERT tokenizer — `TBertTokenizer` — inspired by the .NET [`FastBertTokenizer`](https://github.com/georg-jung/FastBertTokenizer). It supports WordPiece tokenization and converts text into token ID sequences ready for input into BERT models via ONNX.
 
 ## 📦 Features
 
