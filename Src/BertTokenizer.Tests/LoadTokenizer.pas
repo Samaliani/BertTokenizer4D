@@ -44,10 +44,13 @@ uses
   BertTokenizer;
 
 procedure DoLoadTokenizer(const APath: string; Lowercase: Boolean);
+var
+  Stream: TStream;
+  Tokenizer: TBertTokenizer;
 begin
-  var Stream := TFileStream.Create(APath, fmOpenRead);
+  Stream := TFileStream.Create(APath, fmOpenRead);
   try
-    var Tokenizer := TBertTokenizer.Create;
+    Tokenizer := TBertTokenizer.Create;
     try
       Tokenizer.LoadVocabularyFromStream(Stream, Lowercase);
     finally
