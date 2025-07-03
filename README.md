@@ -4,17 +4,16 @@ A Delphi implementation of the BERT tokenizer — `TBertTokenizer` — inspired 
 
 ## 📦 Features
 
-- Load vocabulary from file or stream
-- Load tokenizer from JSON
-- Load tokenizer from Hugging Face
-- Converts raw text into token ID arrays
-- Decodes tokens into text
-- Compatible with [TONNXRuntime](https://github.com/hshatti/TONNXRuntime) for inference
+* Load vocabulary from file (`vocab.txt`) or stream
+* Load tokenizer configuration from Hugging Face (`tokenizer.json`)
+* Converts raw text into token ID arrays
+* Decodes token IDs back into readable text
+* Compatible with [TONNXRuntime](https://github.com/hshatti/TONNXRuntime) for ONNX inference
 
 ## 📁 Project Structure
 
-- Main unit: `Src/BertTokenizer/BertTokenizer.pas`
-- Core class: `TBertTokenizer`
+* Main unit: `Src/BertTokenizer/BertTokenizer.pas`
+* Core class: `TBertTokenizer`
 
 ## 🚀 Quick Start
 
@@ -33,27 +32,34 @@ begin
     Tokenizer.Free;
   end;
 end;
-````
+```
 
 ## 🧠 Public API
 
-| Method                                    | Description                                            |
-| ----------------------------------------- | ------------------------------------------------------ |
-| `LoadVocabulary(FileName, ...)`           | Loads vocabulary from a file                           |
-| `LoadVocabularyFromStream(Stream, ...)`   | Loads vocabulary from a stream                         |
-| `LoadTokenizerJson(FileName)`             | Loads tokenizer from a JSON file                       |
-| `LoadTokenizerJsonFromStream(Stream)`     | Loads tokenizer from a JSON stream                     |
-| `Encode(Text)`                            | Tokenizes input text and returns an array of token IDs |
-| `Decode(Tokens)`                          | Decodes an array of token IDs back to text             |
-| ...                                       |                                                        |
-| `LoadFromHuggingFace(HuggingFaceRepo)`    | Loads tokenizer from Higghing Face                     |
+| Method                                  | Description                                            |
+| --------------------------------------- | ------------------------------------------------------ |
+| `LoadVocabulary(FileName, ...)`         | Loads vocabulary from a `vocab.txt` file               |
+| `LoadVocabularyFromStream(Stream, ...)` | Loads vocabulary from a stream                         |
+| `LoadTokenizerJson(FileName)`           | Loads tokenizer from a Hugging Face `tokenizer.json`   |
+| `LoadTokenizerJsonFromStream(Stream)`   | Loads tokenizer from a JSON stream                     |
+| `Encode(Text)`                          | Tokenizes input text and returns an array of token IDs |
+| `Decode(Tokens)`                        | Decodes an array of token IDs back to text             |
+| `LoadFromHuggingFace(HuggingFaceRepo)`  | Loads tokenizer from Hugging Face repo by name         |
 
+### ✅ Supported Tokenizer Formats
+
+* **`vocab.txt`** — standard BERT vocabulary file
+* **`tokenizer.json`** — Hugging Face tokenizer format (WordPiece-based)
 
 ## ✅ Dependencies
 
 * **Delphi 10.2 Tokyo+**
 * No external dependencies required for core functionality
-* Optional test support via [`DUnitX`](https://github.com/VSoftTechnologies/DUnitX)
+* Optional test suite using [`DUnitX`](https://github.com/VSoftTechnologies/DUnitX)
+
+### 🧪 Test Coverage
+
+This project includes unit tests covering all major tokenizer functionality using `DUnitX`.
 
 ## 🤖 BERT + ONNX Integration
 
@@ -62,6 +68,3 @@ The output of `Encode` is compatible with ONNX BERT models. You can use [`TONNXR
 ## 📄 License
 
 MIT License — free to use, modify, and distribute.
-
-
-
