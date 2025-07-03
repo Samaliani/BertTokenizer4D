@@ -45,8 +45,7 @@ end;
 | `LoadTokenizerJsonFromStream(Stream)`     | Loads tokenizer from a JSON stream                     |
 | `Encode(Text)`                            | Tokenizes input text and returns an array of token IDs |
 | `Decode(Tokens)`                          | Decodes an array of token IDs back to text             |
-
-| Extension                                                                                          |
+| ...                                       |                                                        |
 | `LoadFromHuggingFace(HuggingFaceRepo)`    | Loads tokenizer from Higghing Face                     |
 
 
