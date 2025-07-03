@@ -11,6 +11,8 @@ uses
 {$SCOPEDENUMS ON}
 
 type
+  ETokenizerException = class(Exception);
+
   // Not used currently
   TNormalizationForm = (
     FormC = 1,
@@ -23,17 +25,21 @@ type
   private
     FPrefixes: TDictionary<string, Integer>;
     FSuffixes: TDictionary<string, Integer>;
-    FConvertInputToLowercase: Boolean;
+    FDecodePrefixes: TDictionary<Integer, string>;
+    FDecodeSuffixes: TDictionary<Integer, string>;
     FDecoderPrefix: string;
+    FNormalization: TNormalizationForm; // not supported currently
+    FCleanupTokenizationSpaces: Boolean; // not supported currently
+    FConvertInputToLowercase: Boolean;
     FUnkId, FClsId, FSepId, FPadId: Integer;
-    function PreProcessText(const AText: string): TArray<string>;
+    procedure CheckVocabulary;
+    function EmitNoSpaceBefore(const APrefix: string): Boolean;
     function NormalizeText(const AText: string): string;
+    function PreProcessText(const AText: string): TArray<string>;
     function TokenizeSubword(const AWord: string; Tokens: TList<Integer>): Integer;
     function Tokenize(const AText: string): TList<Integer>;
-  protected
-    function LoadVocabularyFromStreamImpl(Stream: TStream; ConvertInputToLowercase: Boolean; const AUnknownToken: string;
-      const AClsToken: string; const ASepToken: string; const APadToken: string; Normalization : TNormalizationForm): ITask;
   public
+    constructor Create;
     destructor Destroy; override;
 
     procedure LoadVocabulary(const AFileName: string; ConvertInputToLowercase: Boolean;
@@ -42,154 +48,156 @@ type
     procedure LoadVocabularyFromStream(Stream: TStream; ConvertInputToLowercase: Boolean;
       const AUnknownToken: string = '[UNK]'; const AClsToken: string = '[CLS]'; const ASepToken: string = '[SEP]';
       const APadToken: string = '[PAD]'; Normalization : TNormalizationForm = TNormalizationForm.FormD);
+    procedure LoadTokenizerJson(const AFileName: string);
+    procedure LoadTokenizerJsonFromStream(Stream: TStream);
 
     function Encode(const AText: string): TArray<Integer>;
+    function Decode(const ATokens: TArray<Integer>): string;
   end;
 
 implementation
 
 uses
-  System.Character;
+  System.Character,
+  BertTokenizer.Loader,
+  BertTokenizer.Json;
 
 type
-  TBertTokenizerLoaderStream = class(TTask)
-
+  TDictionaryReverser = class
+    class function Reverse<K, V>(const ADictionary: TDictionary<K, V>): TDictionary<V, K>;
   end;
 
-function TBertTokenizer.LoadVocabularyFromStreamImpl(Stream: TStream; ConvertInputToLowercase: Boolean; const AUnknownToken: string;
-  const AClsToken: string; const ASepToken: string; const APadToken: string; Normalization : TNormalizationForm): ITask;
-
-const
-  VocabTxtDefaultContinuingSubwordPrefix = '##';
-
-var
-  Prefixes, Suffixes: TDictionary<string, Integer>;
-  UnkId, ClsId, SepId, PadId: Integer;
-  Token: Integer;
-
-  procedure StartCheck;
-  begin
-    if Stream = nil then
-      raise EArgumentNilException.Create('Stream parameter is nil');
-    if AUnknownToken = '' then
-      raise EArgumentException.Create('AUnknownToken is not specified');
-    if AClsToken = '' then
-      raise EArgumentException.Create('AClsToken is not specified');
-    if ASepToken = '' then
-      raise EArgumentException.Create('ASepToken is not specified');
-    if APadToken = '' then
-      raise EArgumentException.Create('APadToken is not specified');
-
-    if FPrefixes <> nil then
-      raise EInvalidOperation.Create('Vocabulary already loaded.');
-  end;
-
-
-  procedure Init;
-  begin
-    Prefixes := TDictionary<string, Integer>.Create;
-    Suffixes := TDictionary<string, Integer>.Create;
-
-    UnkId := -1;
-    ClsId := -1;
-    SepId := -1;
-    PadId := -1;
-
-    Token := 0;
-  end;
-
-  procedure HandleLine(const ALine: string);
-  begin
-    if ALine <> '' then
-    begin
-      if ALine.StartsWith(VocabTxtDefaultContinuingSubwordPrefix) then
-        Suffixes.Add(ALine.Substring(VocabTxtDefaultContinuingSubwordPrefix.Length), Token)
-      else if string.CompareOrdinal(ALine, AUnknownToken) = 0 then
-        UnkId := Token
-      else if string.CompareOrdinal(ALine, AClsToken) = 0 then
-        ClsId := Token
-      else if string.CompareOrdinal(ALine, ASepToken) = 0 then
-        SepId := Token
-      else if string.CompareOrdinal(ALine, APadToken) = 0 then
-        PadId := Token
-      else
-        Prefixes.Add(ALine, Token);
-    end;
-    Inc(Token);
-  end;
-
-  procedure ProcessLines;
-  var
-    Lines: TStringList;
-    I: Integer;
-  begin
-    Token := 0;
-    Lines := TStringList.Create;
-    try
-      Lines.LoadFromStream(Stream, TEncoding.UTF8);
-      for I := 0 to Lines.Count - 1 do
-        HandleLine(Lines[I]);
-    finally
-      Lines.Free;
-    end;
-  end;
-
-  procedure FinalCheck;
-  begin
-    if UnkId = -1 then
-      raise EInvalidOperation.CreateFmt('Vocabulary does not contain unknown token %s', [AUnknownToken]);
-    if ClsId = -1 then
-      raise EInvalidOperation.CreateFmt('Vocabulary does not contain cls token %s', [AClsToken]);
-    if SepId = -1 then
-      raise EInvalidOperation.CreateFmt('Vocabulary does not contain sep token %s', [ASepToken]);
-    if PadId = -1 then
-      raise EInvalidOperation.CreateFmt('Vocabulary does not contain pad token %s', [APadToken]);
-  end;
-
-  procedure CleanUpOnException;
-  begin
-    Prefixes.Free;
-    Suffixes.Free;
-  end;
-
-  procedure CopyToInstance;
-  begin
-    FPrefixes := Prefixes;
-    FSuffixes := Suffixes;
-
-    FConvertInputToLowercase := ConvertInputToLowercase;
-    FDecoderPrefix := VocabTxtDefaultContinuingSubwordPrefix;
-
-    FUnkId := UnkId;
-    FClsId := ClsId;
-    FSepId := SepId;
-    FPadId := PadId;
-  end;
-
+procedure ReadLoaderData(Tokenizer: TBertTokenizer; Loader: TBertTokenizerLoader);
 begin
-  StartCheck;
-  Init;
-  try
-    ProcessLines;
-    FinalCheck;
-  except
-    on E: Exception do
-    begin
-      CleanUpOnException;
-      raise;
-    end;
-  end;
+  Tokenizer.FPrefixes.Free;
+  Tokenizer.FSuffixes.Free;
+  Tokenizer.FDecodePrefixes.Free;
+  Tokenizer.FDecodeSuffixes.Free;
 
-  CopyToInstance;
+  Tokenizer.FPrefixes := Loader.Prefixes;
+  Tokenizer.FSuffixes := Loader.Suffixes;
+
+  Tokenizer.FDecoderPrefix := Loader.SuffixPrefix;
+  Tokenizer.FConvertInputToLowercase := Loader.ConvertInputToLowercase;
+  Tokenizer.FNormalization := Loader.Normalization;
+
+  // TODO: More props currenty not supported
+  // strip_accents (bool, optional) – Whether to strip all accents. If this option is not specified (ie == None), then it will be determined by the value for lowercase (as in the original Bert).
+  //_stripAccents = tok.Normalizer.StripAccents ?? _lowercaseInput;
+  //_decoderPrefix = tok.Decoder?.Prefix ?? "##";
+  Tokenizer.FCleanupTokenizationSpaces := Loader.CleanupTokenizationSpaces; //_cleanupTokenizationSpaces = tok.Decoder?.Cleanup ?? true;
+
+
+
+  // Maybe we need string representation as well at some point
+  Tokenizer.FUnkId := Loader.UnkId;
+  Tokenizer.FClsId := Loader.ClsId;
+  Tokenizer.FSepId := Loader.SepId;
+  Tokenizer.FPadId := Loader.PadId;
+end;
+
+{ TDictionaryReverser }
+
+class function TDictionaryReverser.Reverse<K, V>(const ADictionary: TDictionary<K, V>): TDictionary<V, K>;
+var
+  Pair: TPair<K, V>;
+begin
+  Result := TDictionary<V, K>.Create;
+  for Pair in ADictionary do
+    Result.Add(Pair.Value, Pair.Key);
 end;
 
 { TBertTokenizer }
+
+constructor TBertTokenizer.Create;
+begin
+  inherited Create;
+  FCleanupTokenizationSpaces := True;
+end;
 
 destructor TBertTokenizer.Destroy;
 begin
   FPrefixes.Free;
   FSuffixes.Free;
+  FDecodePrefixes.Free;
+  FDecodeSuffixes.Free;
   inherited;
+end;
+
+// See https://github.com/huggingface/tokenizers/blob/daf361676bdfd14088f7e0bc087effc6a9cfdf3e/tokenizers/src/decoders/wordpiece.rs#L31
+function TBertTokenizer.EmitNoSpaceBefore(const APrefix: string): Boolean;
+begin
+  Result := (APrefix = '.') or
+    (APrefix = '?') or
+    (APrefix = '!') or
+    (APrefix = ',');
+end;
+
+procedure TBertTokenizer.CheckVocabulary;
+begin
+  if FPrefixes = nil then
+    raise ETokenizerException.Create('Vocabulary not loaded');
+  if FSuffixes = nil then
+    raise ETokenizerException.Create('Vocabulary not loaded');
+end;
+
+function TBertTokenizer.Decode(const ATokens: TArray<Integer>): string;
+var
+  StringBuilder: TStringBuilder;
+  Prefix, Suffix: string;
+  I: Integer;
+begin
+  CheckVocabulary;
+
+  Result := '';
+  if FDecodePrefixes = nil then
+    FDecodePrefixes := TDictionaryReverser.Reverse<string, Integer>(FPrefixes);
+  if FDecodeSuffixes = nil then
+    FDecodeSuffixes := TDictionaryReverser.Reverse<string, Integer>(FSuffixes);
+
+  if Length(ATokens) = 0 then
+    Exit;
+
+  StringBuilder := TStringBuilder.Create();
+  try
+    if FDecodePrefixes.TryGetValue(ATokens[0], Prefix) then
+      StringBuilder.Append(Prefix)
+    else
+    begin
+      // Our decoded text does not start with a word start but in the middle of a word.
+      StringBuilder.Append(FDecoderPrefix);
+      StringBuilder.Append(FDecodeSuffixes[ATokens[0]]);
+    end;
+
+    for I := 1 to Length(ATokens) -1  do
+    begin
+      if FDecodePrefixes.TryGetValue(ATokens[I], Prefix) then
+      begin
+        if (not FCleanupTokenizationSpaces) or (not EmitNoSpaceBefore(Prefix)) then
+          StringBuilder.Append(' ');
+        StringBuilder.Append(Prefix);
+      end;
+      if FDecodeSuffixes.TryGetValue(ATokens[I], Suffix) then
+        StringBuilder.Append(Suffix);
+    end;
+
+    // There is probably a faster implementation of this.
+    // Decode isn't currently the focus though.
+    if FCleanupTokenizationSpaces then
+    begin
+      StringBuilder.Replace(' '' ', '''');
+      StringBuilder.Replace(' n''t', 'n''t');
+      StringBuilder.Replace(' ''m', '''m');
+      StringBuilder.Replace(' do not', 'don''t'); // while this seems strange this is what Hugging Face does
+      StringBuilder.Replace(' ''s', '''s');
+      StringBuilder.Replace(' ''ve', '''ve');
+      StringBuilder.Replace(' ''re', '''re');
+    end;
+
+    Result := StringBuilder.ToString;
+  finally
+    StringBuilder.Free;
+  end;
 end;
 
 function TBertTokenizer.Encode(const AText: string): TArray<Integer>;
@@ -197,6 +205,7 @@ var
   Tokens: TList<Integer>;
   FinalList: TList<Integer>;
 begin
+  CheckVocabulary;
   Tokens := Tokenize(AText);
   try
     FinalList := TList<Integer>.Create;
@@ -213,25 +222,60 @@ begin
   end;
 end;
 
+procedure TBertTokenizer.LoadTokenizerJson(const AFileName: string);
+var
+  Loader: TBertTokenizerJsonLoader;
+begin
+  Loader := TBertTokenizerJsonLoader.Create;
+  try
+    Loader.LoadFromFile(AFileName);
+    ReadLoaderData(Self, Loader);
+  finally
+    Loader.Free;
+  end;
+end;
+
+procedure TBertTokenizer.LoadTokenizerJsonFromStream(Stream: TStream);
+var
+  Loader: TBertTokenizerJsonLoader;
+begin
+  Loader := TBertTokenizerJsonLoader.Create;
+  try
+    Loader.LoadFromStream(Stream);
+    ReadLoaderData(Self, Loader);
+  finally
+    Loader.Free;
+  end;
+end;
+
 procedure TBertTokenizer.LoadVocabulary(const AFileName: string; ConvertInputToLowercase: Boolean;
   const AUnknownToken: string = '[UNK]'; const AClsToken: string = '[CLS]'; const ASepToken: string = '[SEP]';
   const APadToken: string = '[PAD]'; Normalization : TNormalizationForm = TNormalizationForm.FormD);
 var
-  AFileStream: TFileStream;
+  Loader: TBertTokenizerVocabLoader;
 begin
-  AFileStream := TFileStream.Create(AFileName, fmOpenRead);
+  Loader := TBertTokenizerVocabLoader.Create;
   try
-    LoadVocabularyFromStream(AFileStream, ConvertInputToLowercase, AUnknownToken, AClsToken, ASepToken, APadToken, Normalization);
+    Loader.LoadFromFile(AFileName, ConvertInputToLowercase, AUnknownToken, AClsToken, ASepToken, APadToken, Normalization);
+    ReadLoaderData(Self, Loader);
   finally
-    AFileStream.Free;
+    Loader.Free;
   end;
 end;
 
 procedure TBertTokenizer.LoadVocabularyFromStream(Stream: TStream; ConvertInputToLowercase: Boolean;
   const AUnknownToken: string = '[UNK]'; const AClsToken: string = '[CLS]'; const ASepToken: string = '[SEP]';
   const APadToken: string = '[PAD]'; Normalization : TNormalizationForm = TNormalizationForm.FormD);
+var
+  Loader: TBertTokenizerVocabLoader;
 begin
-  LoadVocabularyFromStreamImpl(Stream, ConvertInputToLowercase, '[UNK]', '[CLS]', '[SEP]', '[PAD]', TNormalizationForm.FormD);
+  Loader := TBertTokenizerVocabLoader.Create;
+  try
+    Loader.LoadFromStream(Stream, ConvertInputToLowercase, AUnknownToken, AClsToken, ASepToken, APadToken, Normalization);
+    ReadLoaderData(Self, Loader);
+  finally
+    Loader.Free;
+  end;
 end;
 
 function TBertTokenizer.NormalizeText(const AText: string): string;
