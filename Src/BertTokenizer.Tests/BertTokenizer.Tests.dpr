@@ -8,7 +8,8 @@ uses
   LoadTokenizer in 'LoadTokenizer.pas',
   Decode in 'Decode.pas',
   BertTokenizer.Json in '..\BertTokenizer\BertTokenizer.Json.pas',
-  BertTokenizer.Loader in '..\BertTokenizer\BertTokenizer.Loader.pas';
+  BertTokenizer.Loader in '..\BertTokenizer\BertTokenizer.Loader.pas',
+  BertTokenizer.Extensions in '..\BertTokenizer\BertTokenizer.Extensions.pas';
 
 {$R *.res}
 

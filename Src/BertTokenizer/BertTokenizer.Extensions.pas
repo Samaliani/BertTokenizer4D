@@ -42,13 +42,9 @@ begin
       HttpClient.Free;
     end;
 
-   // ENetHTTPException
+   // ENetHTTPException ???
     if HttpResponse.StatusCode = 200 then
       Self.LoadTokenizerJsonFromStream(AResponseStream);
-
-
-
-
   finally
     AResponseStream.Free;
   end;

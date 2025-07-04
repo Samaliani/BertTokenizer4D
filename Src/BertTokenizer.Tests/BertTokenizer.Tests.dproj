@@ -5,7 +5,7 @@
         <FrameworkType>VCL</FrameworkType>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Debug</Config>
-        <Platform Condition="'$(Platform)'==''">Win32</Platform>
+        <Platform Condition="'$(Platform)'==''">Win64</Platform>
         <ProjectName Condition="'$(ProjectName)'==''">BertTokenizer.Tests</ProjectName>
         <TargetedPlatforms>3</TargetedPlatforms>
         <AppType>Application</AppType>
@@ -133,6 +133,7 @@
         <DCCReference Include="Decode.pas"/>
         <DCCReference Include="..\BertTokenizer\BertTokenizer.Json.pas"/>
         <DCCReference Include="..\BertTokenizer\BertTokenizer.Loader.pas"/>
+        <DCCReference Include="..\BertTokenizer\BertTokenizer.Extensions.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

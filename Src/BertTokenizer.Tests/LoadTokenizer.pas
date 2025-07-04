@@ -49,7 +49,7 @@ type
     procedure LoadTokenizerFromInvalidJson(const APath: string);
 
     [Test]
-    [TestCase('bert-base-uncased', 'bert-base-uncased')]
+    [TestCase('bge-micro-v2', 'SmartComponents/bge-micro-v2')]
     procedure LoadFromHuggingFace(const AHuggingFaceRepo: string);
 
     [Test]

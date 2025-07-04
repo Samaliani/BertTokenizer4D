@@ -44,6 +44,8 @@ end;
 | `LoadTokenizerJsonFromStream(Stream)`   | Loads tokenizer from a JSON stream                     |
 | `Encode(Text)`                          | Tokenizes input text and returns an array of token IDs |
 | `Decode(Tokens)`                        | Decodes an array of token IDs back to text             |
+| --------------------------------------- | ------------------------------------------------------ |
+| uses BertTokenizer.Extensions           |                                                        |
 | `LoadFromHuggingFace(HuggingFaceRepo)`  | Loads tokenizer from Hugging Face repo by name         |
 
 ### ✅ Supported Tokenizer Formats
@@ -59,7 +61,7 @@ end;
 
 ### 🧪 Test Coverage
 
-This project includes unit tests covering all major tokenizer functionality using `DUnitX`.
+This project includes unit tests using `DUnitX`.
 
 ## 🤖 BERT + ONNX Integration
 
