@@ -25,7 +25,7 @@ procedure LoadTokenizerAndEncode(const APath: string);
 begin
   var Tokenizer := TBertTokenizer.Create;
   try 
-    Tokenizer.LoadFromHuggingFace('bge-micro-v2');
+    Tokenizer.LoadFromHuggingFace('TaylorAI/bge-micro-v2');
     var Tokens := Tokenizer.Encode('Hello, world!');
     // TokenIds can now be passed to a model using TONNXRuntime
   finally
