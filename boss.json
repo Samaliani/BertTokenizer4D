@@ -1,0 +1,9 @@
+{
+	"name": "BertTokenizer4D",
+	"description": "A Delphi implementation of the BERT tokenizer",
+	"version": "1.0.0",
+	"homepage": "https://github.com/Samaliani/BertTokenizer4D",
+	"mainsrc": "./src/BertTokenizer",
+	"projects": [],
+	"dependencies": {}
+}
